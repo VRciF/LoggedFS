@@ -30,11 +30,13 @@ public:
 	int getUID() {return uid;};
 	const char* getAction() {return action;};
 	const char* getRetname() {return retname;};
+	const char* getFormat() {return format;};
 	
 	void setExtension(const char* e) {this->extension=strdup(e);};
 	void setUID(int u) {this->uid=u;};
 	void setAction(const char* a) {this->action=strdup(a);};
 	void setRetname(const char* r) {this->retname=strdup(r);};
+	void setFormat(const char* f) {this->format=strdup(f);};
 	bool matches(const char* path, int uid, const char *action, const char* retname);
 	
 private:
@@ -42,6 +44,7 @@ private:
 	int uid;
 	const char* action;
 	const char* retname;
+	const char *format;
 	bool matches( const char* str,const char* pattern);
 };
 

@@ -32,13 +32,21 @@ xmlChar* RETNAME=xmlCharStrdup("retname");
 xmlChar* ROOT=xmlCharStrdup("loggedFS");
 xmlChar* LOG_ENABLED=xmlCharStrdup("logEnabled");
 xmlChar* PNAME_ENABLED=xmlCharStrdup("printProcessName");
-
+xmlChar* FORMAT=xmlCharStrdup("format");
 
 Config::Config()
 {
     // default values
     enabled=true; 
     pNameEnabled=true;
+
+    std::map<int, std::string> *fstr = Config::formatstrings();
+    // example: getattr /var/ {0} [ pid = 8700 ls uid = 1000 ]
+    //          IACTION IABSPATH {IERRNO} [ pid = IREQPID ICMDNAME uid = IREQUID ]
+    defaultformat = *fstr[Config::FORMAT_IACTION];
+    defaultformat += " "+*fstr[Config::FORMAT_IABSPATH];
+    defaultformat += " {"+*fstr[Config::FORMAT_IERRNO]+"}";
+    defaultformat += "[ pid = "+*fstr[Config::FORMAT_IREQPID]+" "+*fstr[Config::FORMAT_ICMDNAME]+" uid = "+*fstr[Config::FORMAT_IREQUID]+" ]";
 }
 
 Config::~Config()
@@ -116,6 +124,10 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 					{
 					filter->setRetname(buffer);
 					}
+				else if (xmlStrcmp(attr->name,FORMAT)==0)
+					{
+					filter->setFormat(buffer);
+					}
 				else printf("unknown attribute : %s\n",attr->name);
 				attr=attr->next;
 				}
@@ -167,33 +179,49 @@ bool Config::loadFromXmlFile(const char* filename)
 	return loadFromXml(doc);
 }
 
-bool Config::shouldLog(const char* filename, int uid, const char* action, const char* retname)
+bool Config::shouldLog(const char* filename, int uid, const char* action, const char* retname, char **format)
 {
     bool should=false;
+    if(format!=NULL) *format = NULL;
     if (enabled)
     {
     	if (includes.size()>0)
-	{
-		for (unsigned int i=0;i<includes.size() && !should;i++)
 		{
-		Filter f=includes[i];
-		if (f.matches(filename,uid,action,retname))
+			for (unsigned int i=0;i<includes.size() && !should;i++)
+			{
+			Filter f=includes[i];
+			if (f.matches(filename,uid,action,retname))
+				if(format!=NULL) *format = f.getFormat();
+				should=true;
+			}
+			for (unsigned int i=0;i<excludes.size() && should;i++)
+			{
+			Filter f=excludes[i];
+			if (f.matches(filename,uid,action,retname))
+				should=false;
+			}
+		}
+		else
+		{
 			should=true;
 		}
-		for (unsigned int i=0;i<excludes.size() && should;i++)
-		{
-		Filter f=excludes[i];
-		if (f.matches(filename,uid,action,retname))
-			should=false;
-		}
-	}
-	else
-	{
-		should=true;
-	}
 
     }
     
     return should;
+}
+
+std::map<int, std::string>* Config::formatstrings(){
+	static std::map<int, std::string> formatstrings;
+	if(formatstrings.size()<=0){
+		formatstrings[Config::FORMAT_ACTION] = "[action]";
+		formatstrings[Config::FORMAT_ERRNO] = "[errno]";
+		formatstrings[Config::FORMAT_REQPID] = "[reqpid]";
+		formatstrings[Config::FORMAT_REQUID] = "[requid]";
+		formatstrings[Config::FORMAT_REQGID] = "[reqgid]";
+		formatstrings[Config::FORMAT_REQUMASK] = "[requmask]";
+		formatstrings[Config::FORMAT_CMDNAME] = "[cmdname]";
+	}
+	return &formatstrings;
 }
 

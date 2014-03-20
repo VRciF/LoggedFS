@@ -41,6 +41,42 @@ public:
     bool shouldLog(const char* filename, int uid, const char* action, const char *retname);
     char* toString();
 
+    static std::map<int, std::string>* formatstrings();
+
+    enum Format {
+    	FORMAT_ACTION = 0,
+    	FORMAT_ERRNO,
+    	FORMAT_REQPID,
+    	FORMAT_REQUID,
+    	FORMAT_REQGID,
+    	FORMAT_REQUMASK,
+    	FORMAT_CMDNAME,
+
+    	FORMAT_UID,
+    	FORMAT_GID,
+    	FORMAT_USERNAME,
+    	FORMAT_GROUPNAME,
+
+    	FORMAT_ABSPATH,
+    	FORMAT_RELPATH,
+    	FORMAT_MODE,
+    	FORMAT_RDEV, // used in mknod
+
+    	FORMAT_FROMABSPATH,
+    	FORMAT_TOABSPATH,
+    	FORMAT_FROMRELPATH,
+    	FORMAT_TORELPATH,
+
+    	FORMAT_FLAGS,
+    	FORMAT_ATIME,
+    	FORMAT_MTIME,
+    	FORMAT_OFFSET,
+    	FORMAT_SIZE,
+
+    	FORMAT_XATTRNAME,
+    	FORMAT_XATTRVALUE,
+    	FORMAT_XATTRLIST,
+    };
 
 private:
     void parse(xmlNode*);
@@ -49,6 +85,8 @@ private:
     bool enabled;
     bool timeEnabled;
     bool pNameEnabled;
+
+    std::string defaultformat;
 };
 
 #endif
