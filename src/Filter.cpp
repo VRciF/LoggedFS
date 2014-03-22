@@ -17,6 +17,13 @@
 #include "Filter.h"
 #include <pcre.h>
 
+#include <rlog/rlog.h>
+#include <rlog/Error.h>
+#include <rlog/RLogChannel.h>
+#include <rlog/SyslogNode.h>
+#include <rlog/StdioNode.h>
+
+
 #define OVECCOUNT 30
 
 
@@ -46,7 +53,7 @@ bool Filter::matches( const std::string &str, const std::string &pattern)
 
     if (re == NULL)
     {
-        //printf("PCRE compilation failed at offset %d: %s\n", erroffset, error);
+        rError("PCRE compilation failed at offset %d: %s\n", erroffset, error);
         return false;
     }
 

@@ -21,7 +21,11 @@
 #include <iostream>
 
 
-
+#include <rlog/rlog.h>
+#include <rlog/Error.h>
+#include <rlog/RLogChannel.h>
+#include <rlog/SyslogNode.h>
+#include <rlog/StdioNode.h>
 
 xmlChar* INCLUDE=xmlCharStrdup("include");
 xmlChar* EXCLUDE=xmlCharStrdup("exclude");
@@ -75,10 +79,6 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 					if (xmlStrcmp(attr->children->content,xmlCharStrdup("true"))!=0)
 						{
 						enabled=false;
-						printf("Log disabled\n");
-						}
-					else	{
-						printf("Log enabled\n");
 						}
 					}
 				else if (xmlStrcmp(attr->name,PNAME_ENABLED)==0)
@@ -87,13 +87,9 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 					if (xmlStrcmp(attr->children->content,xmlCharStrdup("true"))!=0)
 						{
 						pNameEnabled=false;
-						printf("print process name disabled\n");
-						}
-					else	{
-						printf("print process name enabled\n");
 						}
 					}
-				else printf("unknown attribute : %s\n",attr->name);
+				else rError("unknown attribute : %s\n",attr->name);
 				attr=attr->next;
 				}
 			}
@@ -128,7 +124,7 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 					{
 					filter->setFormat(buffer);
 					}
-				else printf("unknown attribute : %s\n",attr->name);
+				else rError("unknown attribute : %s\n",attr->name);
 				attr=attr->next;
 				}
 			

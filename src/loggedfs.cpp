@@ -49,6 +49,9 @@
 #include <pwd.h>
 #include <grp.h>
 
+#include <limits.h>
+#include <stdlib.h>
+
 #include <sys/file.h>
 #include <signal.h>
 
@@ -804,9 +807,9 @@ static int loggedFS_fallocate(const char *path, int mode,
 
 static void usage(char *name)
 {
-     fprintf(stderr, "Usage:\n");
-     fprintf(stderr, "%s [-h] | [-l log-file] [-c config-file] [-f] [-p] [-e] /directory-mountpoint\n",name);
-     fprintf(stderr, "Type 'man loggedfs' for more details\n");
+     rError("Usage:\n");
+     rError("%s [-h] | [-l log-file] [-c config-file] [-f] [-p] [-e] /directory-mountpoint\n",name);
+     rError("Type 'man loggedfs' for more details\n");
      return;
 }
 
@@ -873,7 +876,7 @@ bool processArgs(int argc, char *argv[], LoggedFS_Args *out)
             break;
         case 'l':
         	logfilename = std::string(optarg);
-            fileLog=open(logfilename.c_str(),O_WRONLY|O_CREAT|O_APPEND );
+            fileLog=open(logfilename.c_str(),O_WRONLY|O_CREAT|O_APPEND , S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
             fileLogNode=new StdioNode(fileLog);
             fileLogNode->subscribeTo( RLOG_CHANNEL("") );
 	    	rLog(Info,"LoggedFS log file : %s",optarg);
@@ -897,11 +900,10 @@ bool processArgs(int argc, char *argv[], LoggedFS_Args *out)
         out->mountPoint = std::string(argv[optind++]);
         if(*out->mountPoint.rbegin()=='/')
         	out->mountPoint = out->mountPoint.substr(0, out->mountPoint.size()-1);
-        out->fuseArgv[1] = out->mountPoint.c_str();
     }
     else
     {
-        fprintf(stderr,"Missing mountpoint\n");
+        rError("Missing mountpoint");
 	usage(argv[0]);
         return false;
     }
@@ -919,12 +921,32 @@ bool processArgs(int argc, char *argv[], LoggedFS_Args *out)
         }
     }
 
+    if(out->mountPoint.length()<=0){
+    	rError("invalid (none) mountpoint given");
+    }
     if(!isAbsolutePath( out->mountPoint ))
     {
-        fprintf(stderr,"You must use absolute paths "
-                "(beginning with '/') for %s\n",out->mountPoint.c_str());
-        return false;
+    	char *tmpc = getcwd(NULL, 0);
+    	if(tmpc==NULL){
+    		rError("Could not get current working directory (getcwd:%d)", errno);
+    		return false;
+    	}
+    	std::string tmppath(tmpc);
+    	free(tmpc);
+
+    	tmppath += "/";
+    	tmppath += out->mountPoint;
+
+    	tmpc = realpath(tmppath.c_str() ,NULL);
+    	if(tmpc==NULL){
+    		rError("Could not get absolute mount point directory (realpath:%d) for %s", errno, out->mountPoint.c_str());
+    		return false;
+    	}
+    	out->mountPoint = std::string(tmpc);
+    	free(tmpc);
     }
+    out->fuseArgv[1] = out->mountPoint.c_str();
+
     return true;
 }
 
@@ -945,8 +967,15 @@ int main(int argc, char *argv[])
     RLogInit( argc, argv );
 
     StdioNode* stdLog=new StdioNode(STDOUT_FILENO);
-    stdLog->subscribeTo( RLOG_CHANNEL("") );
+    stdLog->subscribeTo( RLOG_CHANNEL("critical") );
+    stdLog->subscribeTo( RLOG_CHANNEL("warning") );
+    stdLog->subscribeTo( RLOG_CHANNEL("notice") );
+    stdLog->subscribeTo( RLOG_CHANNEL("info") );
+    stdLog->subscribeTo( RLOG_CHANNEL("debug") );
     SyslogNode *logNode = NULL;
+
+    StdioNode* stdErr = new StdioNode(STDERR_FILENO);
+    stdErr->subscribeTo( RLOG_CHANNEL("error") );
 
     signal (SIGHUP, reopenLogFile);
 
