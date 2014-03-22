@@ -43,10 +43,10 @@ Config::Config()
     std::map<int, std::string> *fstr = Config::formatstrings();
     // example: getattr /var/ {0} [ pid = 8700 ls uid = 1000 ]
     //          IACTION IABSPATH {IERRNO} [ pid = IREQPID ICMDNAME uid = IREQUID ]
-    defaultformat = *fstr[Config::FORMAT_IACTION];
-    defaultformat += " "+*fstr[Config::FORMAT_IABSPATH];
-    defaultformat += " {"+*fstr[Config::FORMAT_IERRNO]+"}";
-    defaultformat += "[ pid = "+*fstr[Config::FORMAT_IREQPID]+" "+*fstr[Config::FORMAT_ICMDNAME]+" uid = "+*fstr[Config::FORMAT_IREQUID]+" ]";
+    defaultformat = (*fstr)[Config::FORMAT_ACTION];
+    defaultformat += " "+(*fstr)[Config::FORMAT_ABSPATH];
+    defaultformat += " {"+(*fstr)[Config::FORMAT_ERRNO]+"}";
+    defaultformat += "[ pid = "+(*fstr)[Config::FORMAT_REQPID]+" "+(*fstr)[Config::FORMAT_CMDNAME]+" uid = "+(*fstr)[Config::FORMAT_REQUID]+" ]";
 }
 
 Config::~Config()
@@ -191,7 +191,7 @@ bool Config::shouldLog(const char* filename, int uid, const char* action, const 
 			{
 			Filter f=includes[i];
 			if (f.matches(filename,uid,action,retname))
-				if(format!=NULL) *format = f.getFormat();
+				if(format!=NULL) *format = (char*) f.getFormat();
 				should=true;
 			}
 			for (unsigned int i=0;i<excludes.size() && should;i++)

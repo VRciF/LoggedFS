@@ -23,6 +23,10 @@ using namespace std;
 #include <vector>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+
+#include <map>
+#include <string>
+
 #include "Filter.h"
 
 class Config
@@ -38,7 +42,7 @@ public:
     bool isEnabled() {return enabled;};
     bool isTimeEnabled() {return timeEnabled;};
     bool isPrintProcessNameEnabled() {return pNameEnabled;};
-    bool shouldLog(const char* filename, int uid, const char* action, const char *retname);
+    bool shouldLog(const char* filename, int uid, const char* action, const char* retname, char **format);
     char* toString();
 
     static std::map<int, std::string>* formatstrings();
