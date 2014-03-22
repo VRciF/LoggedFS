@@ -28,7 +28,7 @@ Filter::~Filter()
 {
 }
 
-bool Filter::matches( const char* str,const char* pattern)
+bool Filter::matches( const std::string &str, const std::string &pattern)
 {
     pcre *re;
     const char *error;
@@ -37,7 +37,7 @@ bool Filter::matches( const char* str,const char* pattern)
 
 
     re = pcre_compile(
-             pattern,
+             pattern.c_str(),
              0,
              &error,
              &erroffset,
@@ -46,15 +46,15 @@ bool Filter::matches( const char* str,const char* pattern)
 
     if (re == NULL)
     {
-        printf("PCRE compilation failed at offset %d: %s\n", erroffset, error);
+        //printf("PCRE compilation failed at offset %d: %s\n", erroffset, error);
         return false;
     }
 
     int rc = pcre_exec(
                  re,                   /* the compiled pattern */
                  NULL,                 /* no extra data - we didn't study the pattern */
-                 str,              /* the subject string */
-                 strlen(str),       /* the length of the subject */
+                 str.c_str(),              /* the subject string */
+                 str.length(),       /* the length of the subject */
                  0,                    /* start at offset 0 in the subject */
                  0,                    /* default options */
                  ovector,              /* output vector for substring information */
@@ -66,7 +66,7 @@ bool Filter::matches( const char* str,const char* pattern)
 
 
 
-bool Filter::matches(const char* path,int uid, const char *action, const char* retname)
+bool Filter::matches(const std::string path,int uid, const std::string action, const std::string retname)
 {
 bool a= (matches(path,this->extension) && (uid==this->uid || this->uid==-1) && matches(action,this->action) && matches(retname,this->retname));
 

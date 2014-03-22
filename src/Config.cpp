@@ -100,19 +100,19 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 		if (xmlStrcmp(cur_node->name,INCLUDE)==0 || xmlStrcmp(cur_node->name,EXCLUDE)==0)
 			{
 			Filter* filter=new Filter();
-			char* buffer=new char[100];
+			std::string buffer;
 			while (attr!=NULL)
 				{
-				
-				sprintf(buffer,"%s",attr->children->content); // I guess there's another way to do that
+				buffer = std::string((char*)attr->children->content);
+
 				if (xmlStrcmp(attr->name,EXTENSION)==0)
 					{
 					filter->setExtension(buffer);
 					}
 				else if (xmlStrcmp(attr->name,USER)==0)
 					{
-					if (strcmp(buffer,"*"))
-						filter->setUID(atoi(buffer));
+					if (buffer.compare("*")!=0)
+						filter->setUID(atoi(buffer.c_str()));
 					else filter->setUID(-1); // every users
 
 					}
@@ -137,7 +137,6 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 				includes.push_back(*filter);
 				}
 			else excludes.push_back(*filter);
-			delete buffer;
 			}		
     		}
 		
@@ -159,30 +158,30 @@ bool Config::loadFromXml(xmlDoc* doc)
 	return true;
 }
 
-bool Config::loadFromXmlBuffer(const char* buffer)
+bool Config::loadFromXmlBuffer(const std::string buffer)
 {
 	xmlDoc *doc = NULL;
 
 	LIBXML_TEST_VERSION
 	
-	doc=xmlReadMemory(buffer,strlen(buffer),"",NULL, XML_PARSE_NONET);
+	doc=xmlReadMemory(buffer.c_str(),buffer.length(),"",NULL, XML_PARSE_NONET);
 	return loadFromXml(doc);
 }
 
-bool Config::loadFromXmlFile(const char* filename)
+bool Config::loadFromXmlFile(const std::string filename)
 {
 	xmlDoc *doc = NULL;
 
 	LIBXML_TEST_VERSION
 	
-	doc = xmlReadFile(filename, NULL, 0);
+	doc = xmlReadFile(filename.c_str(), NULL, 0);
 	return loadFromXml(doc);
 }
 
-bool Config::shouldLog(const char* filename, int uid, const char* action, const char* retname, char **format)
+bool Config::shouldLog(const char* filename, int uid, const char* action, const char* retname, std::string &format)
 {
     bool should=false;
-    if(format!=NULL) *format = NULL;
+
     if (enabled)
     {
     	if (includes.size()>0)
@@ -191,7 +190,7 @@ bool Config::shouldLog(const char* filename, int uid, const char* action, const 
 			{
 			Filter f=includes[i];
 			if (f.matches(filename,uid,action,retname))
-				if(format!=NULL) *format = (char*) f.getFormat();
+				format.replace(format.begin(),format.end(), f.getFormat());
 				should=true;
 			}
 			for (unsigned int i=0;i<excludes.size() && should;i++)

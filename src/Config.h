@@ -35,14 +35,14 @@ public:
     Config();
     ~Config();
 
-    bool load(const char *fileName);
-    bool loadFromXmlFile(const char *fileName);
-    bool loadFromXmlBuffer(const char *buffer);
+    //bool load(const std::string fileName);
+    bool loadFromXmlFile(const std::string fileName);
+    bool loadFromXmlBuffer(const std::string buffer);
     bool loadFromXml(xmlDoc* doc);
     bool isEnabled() {return enabled;};
     bool isTimeEnabled() {return timeEnabled;};
     bool isPrintProcessNameEnabled() {return pNameEnabled;};
-    bool shouldLog(const char* filename, int uid, const char* action, const char* retname, char **format);
+    bool shouldLog(const char* filename, int uid, const char* action, const char* retname, std::string &format);
     char* toString();
 
     static std::map<int, std::string>* formatstrings();

@@ -17,35 +17,33 @@
 #ifndef LOGGEDFS_FILTER_H
 #define LOGGEDFS_FILTER_H
 
-#include <stdio.h>
-#include <string.h>
-
+#include <string>
 
 class Filter
 {
 public:
 	Filter();
 	~Filter();
-	const char* getExtension() {return extension;};
+	std::string getExtension() {return extension;};
 	int getUID() {return uid;};
-	const char* getAction() {return action;};
-	const char* getRetname() {return retname;};
-	const char* getFormat() {return format;};
+	std::string getAction() {return action;};
+	std::string getRetname() {return retname;};
+	std::string getFormat() {return format;};
 	
-	void setExtension(const char* e) {this->extension=strdup(e);};
+	void setExtension(const std::string e) {this->extension=e;};
 	void setUID(int u) {this->uid=u;};
-	void setAction(const char* a) {this->action=strdup(a);};
-	void setRetname(const char* r) {this->retname=strdup(r);};
-	void setFormat(const char* f) {this->format=strdup(f);};
-	bool matches(const char* path, int uid, const char *action, const char* retname);
+	void setAction(const std::string a) {this->action=a;};
+	void setRetname(const std::string r) {this->retname=r;};
+	void setFormat(const std::string f) {this->format=f;};
+	bool matches(const std::string path, int uid, const std::string action, const std::string retname);
 	
 private:
-	const char* extension;
+	std::string extension;
 	int uid;
-	const char* action;
-	const char* retname;
-	const char *format;
-	bool matches( const char* str,const char* pattern);
+	std::string action;
+	std::string retname;
+	std::string format;
+	bool matches( const std::string &str,const std::string &pattern);
 };
 
 
