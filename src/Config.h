@@ -26,8 +26,10 @@ using namespace std;
 
 #include <map>
 #include <string>
+#include <bitset>
 
 #include "Filter.h"
+#include "Format.h"
 
 class Config
 {
@@ -42,47 +44,11 @@ public:
     bool isEnabled() {return enabled;};
     bool isTimeEnabled() {return timeEnabled;};
     bool isPrintProcessNameEnabled() {return pNameEnabled;};
-    bool shouldLog(const char* filename, int uid, const char* action, const char* retname, std::string &format);
+    bool shouldLog(const char* filename, int uid, const char* action, const char* retname, Format **format);
+    bool fuzzyShouldLog(int action);
     char* toString();
 
-    static std::map<int, std::string>* formatstrings();
-
-    enum Format {
-    	FORMAT_ACTION = 0,
-    	FORMAT_ERRNO,
-    	FORMAT_REQPID,
-    	FORMAT_REQUID,
-    	FORMAT_REQGID,
-    	FORMAT_REQUMASK,
-    	FORMAT_CMDNAME,
-
-    	FORMAT_UID,
-    	FORMAT_GID,
-    	FORMAT_USERNAME,
-    	FORMAT_GROUPNAME,
-
-    	FORMAT_ABSPATH,
-    	FORMAT_RELPATH,
-    	FORMAT_MODE,
-    	FORMAT_RDEV, // used in mknod
-
-    	FORMAT_FROMABSPATH,
-    	FORMAT_TOABSPATH,
-    	FORMAT_FROMRELPATH,
-    	FORMAT_TORELPATH,
-
-    	FORMAT_FLAGS,
-    	FORMAT_ATIME,
-    	FORMAT_MTIME,
-    	FORMAT_OFFSET,
-    	FORMAT_SIZE,
-
-    	FORMAT_XATTRNAME,
-    	FORMAT_XATTRVALUE,
-    	FORMAT_XATTRLIST,
-    };
-
-private:
+protected:
     void parse(xmlNode*);
     std::vector<Filter> includes;
     std::vector<Filter> excludes;
@@ -90,7 +56,7 @@ private:
     bool timeEnabled;
     bool pNameEnabled;
 
-    std::string defaultformat;
+    Format defaultformat;
 };
 
 #endif

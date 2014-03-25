@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Author:   Rémi Flament <remipouak@yahoo.fr>
+ * Original Author:   Rémi Flament <remipouak@yahoo.fr>
  *
  *****************************************************************************
  * Copyright (c) 2005, Rémi Flament
@@ -38,19 +38,14 @@ xmlChar* LOG_ENABLED=xmlCharStrdup("logEnabled");
 xmlChar* PNAME_ENABLED=xmlCharStrdup("printProcessName");
 xmlChar* FORMAT=xmlCharStrdup("format");
 
+#include "Format.h"
+#include "FSOperations.h"
+
 Config::Config()
 {
     // default values
     enabled=true; 
     pNameEnabled=true;
-
-    std::map<int, std::string> *fstr = Config::formatstrings();
-    // example: getattr /var/ {0} [ pid = 8700 ls uid = 1000 ]
-    //          IACTION IABSPATH {IERRNO} [ pid = IREQPID ICMDNAME uid = IREQUID ]
-    defaultformat = (*fstr)[Config::FORMAT_ACTION];
-    defaultformat += " "+(*fstr)[Config::FORMAT_ABSPATH];
-    defaultformat += " {"+(*fstr)[Config::FORMAT_ERRNO]+"}";
-    defaultformat += "[ pid = "+(*fstr)[Config::FORMAT_REQPID]+" "+(*fstr)[Config::FORMAT_CMDNAME]+" uid = "+(*fstr)[Config::FORMAT_REQUID]+" ]";
 }
 
 Config::~Config()
@@ -61,12 +56,11 @@ Config::~Config()
 
 void Config::parse(xmlNode * a_node)
 {
+	xmlNode *cur_node = NULL;
 
-xmlNode *cur_node = NULL;
-
-for (cur_node = a_node; cur_node; cur_node = cur_node->next) 
+	for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 	{
-	if (cur_node->type == XML_ELEMENT_NODE) 
+		if (cur_node->type == XML_ELEMENT_NODE)
 		{
 		xmlAttr *attr=cur_node->properties;
 		if (xmlStrcmp(cur_node->name,ROOT)==0)
@@ -89,6 +83,11 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 						pNameEnabled=false;
 						}
 					}
+				else if (xmlStrcmp(attr->name,FORMAT)==0)
+					{
+						//default format loggedfs
+						this->defaultformat = Format((const char*)attr->children->content);
+					}
 				else rError("unknown attribute : %s\n",attr->name);
 				attr=attr->next;
 				}
@@ -96,6 +95,7 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 		if (xmlStrcmp(cur_node->name,INCLUDE)==0 || xmlStrcmp(cur_node->name,EXCLUDE)==0)
 			{
 			Filter* filter=new Filter();
+			filter->setFormat(this->defaultformat);
 			std::string buffer;
 			while (attr!=NULL)
 				{
@@ -134,10 +134,9 @@ for (cur_node = a_node; cur_node; cur_node = cur_node->next)
 				}
 			else excludes.push_back(*filter);
 			}		
-    		}
-		
+		}
 
-   	parse(cur_node->children);
+		parse(cur_node->children);
 	}
 
 }
@@ -174,7 +173,33 @@ bool Config::loadFromXmlFile(const std::string filename)
 	return loadFromXml(doc);
 }
 
-bool Config::shouldLog(const char* filename, int uid, const char* action, const char* retname, std::string &format)
+bool Config::fuzzyShouldLog(int action)
+{
+	// this method tries to surley answer the question: shall 'action' not be logged?
+	// thus the logic in this function is kind of non intuitiv
+
+    if (!enabled) return false;
+
+	static std::bitset<64> shallnotlog; // if a method is enabled here, we can be sure that it shall not be logged
+    if(shallnotlog[action]) return false;
+	if (includes.size()>0 && excludes.size()<=0)
+	{
+		shallnotlog[action] = true;
+
+		for (unsigned int i=0;i<includes.size();i++)
+		{
+			Filter f=includes[i];
+			if (f.matches(FSOperations::actions[action],f.getAction())){
+				shallnotlog[action] = false;
+				break;
+			}
+		}
+	}
+	if(shallnotlog[action]) return false;
+
+	return true;
+}
+bool Config::shouldLog(const char* filename, int uid, const char* action, const char* retname, Format **format)
 {
     bool should=false;
 
@@ -182,41 +207,42 @@ bool Config::shouldLog(const char* filename, int uid, const char* action, const 
     {
     	if (includes.size()>0)
 		{
-			for (unsigned int i=0;i<includes.size() && !should;i++)
+			for (unsigned int i=0;i<includes.size();i++)
 			{
-			Filter f=includes[i];
-			if (f.matches(filename,uid,action,retname))
-				format.replace(format.begin(),format.end(), f.getFormat());
-				should=true;
+				Filter f=includes[i];
+				if (f.matches(filename,uid,action,retname)){
+					*format = &(f.getFormat());
+					should=true;
+					break;
+				}
 			}
-			for (unsigned int i=0;i<excludes.size() && should;i++)
+			for (unsigned int i=0;should && i<excludes.size();i++)
 			{
-			Filter f=excludes[i];
-			if (f.matches(filename,uid,action,retname))
-				should=false;
+				Filter f=excludes[i];
+				if (f.matches(filename,uid,action,retname)){
+					should=false;
+					break;
+				}
 			}
 		}
+    	else if(excludes.size()>0)
+    	{
+    		should = true;
+			for (unsigned int i=0;should && i<excludes.size();i++)
+			{
+				Filter f=excludes[i];
+				if (f.matches(filename,uid,action,retname)){
+					should=false;
+					break;
+				}
+			}
+    	}
 		else
 		{
+			*format = &this->defaultformat;
 			should=true;
 		}
-
     }
-    
+
     return should;
 }
-
-std::map<int, std::string>* Config::formatstrings(){
-	static std::map<int, std::string> formatstrings;
-	if(formatstrings.size()<=0){
-		formatstrings[Config::FORMAT_ACTION] = "[action]";
-		formatstrings[Config::FORMAT_ERRNO] = "[errno]";
-		formatstrings[Config::FORMAT_REQPID] = "[reqpid]";
-		formatstrings[Config::FORMAT_REQUID] = "[requid]";
-		formatstrings[Config::FORMAT_REQGID] = "[reqgid]";
-		formatstrings[Config::FORMAT_REQUMASK] = "[requmask]";
-		formatstrings[Config::FORMAT_CMDNAME] = "[cmdname]";
-	}
-	return &formatstrings;
-}
-

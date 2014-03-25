@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Author:   Remi Flament <rflament at laposte dot net>
+ * Original Author:   Remi Flament <rflament at laposte dot net>
  *****************************************************************************
  * Copyright (c) 2005 - 2007, Remi Flament
  *
@@ -16,6 +16,8 @@
  */
 #include "Filter.h"
 #include <pcre.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <rlog/rlog.h>
 #include <rlog/Error.h>
@@ -23,9 +25,12 @@
 #include <rlog/SyslogNode.h>
 #include <rlog/StdioNode.h>
 
+#include <string>
+#include <sstream>
+
+#include "Globals.h"
 
 #define OVECCOUNT 30
-
 
 Filter::Filter()
 {
@@ -34,6 +39,20 @@ Filter::Filter()
 Filter::~Filter()
 {
 }
+
+std::string Filter::getExtension() { return extension; }
+int Filter::getUID() { return uid; }
+std::string Filter::getAction() { return action; }
+std::string Filter::getRetname() { return retname; }
+Format& Filter::getFormat() { return format; }
+
+void Filter::setExtension(const std::string e) { this->extension=e; }
+void Filter::setUID(int u) { this->uid=u; }
+void Filter::setAction(const std::string a) { this->action=a; }
+void Filter::setRetname(const std::string r) { this->retname=r; }
+void Filter::setFormat(const std::string f) { this->format=Format(f); }
+void Filter::setFormat(const Format f) { this->format = f; }
+
 
 bool Filter::matches( const std::string &str, const std::string &pattern)
 {
