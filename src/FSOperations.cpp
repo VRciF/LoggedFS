@@ -490,8 +490,6 @@ int FSOperations::proxy(const char *path, ...){
 
     Util::log(lm);
 
-    printf("%s:%d %s(%s) returned %d\n", __FILE__,__LINE__, FSOperations::actions[N].c_str(), path, result);
-
     return result;
 }
 
@@ -680,12 +678,14 @@ int FSOperations::utimens(const char *path, const struct timespec ts[2])
 
 int FSOperations::create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	return fi->fh = (::creat(Util::getRelativePath(path).c_str(), mode)*errno);
+	fi->fh = ::creat(Util::getRelativePath(path).c_str(), mode);
+	return (int)fi->fh==-1 ? -errno : 0;
 }
 
 int FSOperations::open(const char *path, struct fuse_file_info *fi)
 {
-    return fi->fh = (::open(Util::getRelativePath(path).c_str(), fi->flags)*errno);
+    fi->fh = ::open(Util::getRelativePath(path).c_str(), fi->flags);
+    return (int)fi->fh==-1 ? -errno : 0;
 }
 
 int FSOperations::read(const char *path, char *buf, size_t size, off_t offset,
