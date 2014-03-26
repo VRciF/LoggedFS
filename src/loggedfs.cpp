@@ -279,9 +279,10 @@ int main(int argc, char *argv[])
 	Globals::instance()->instance();
     rlog::RLogInit( argc, argv );
 
+    rlog::SyslogNode *logNode = NULL;
+
     rlog::StdioNode* stdLog = new LoggedFSRLogNode(STDOUT_FILENO);
     stdLog->subscribeTo( RLOG_CHANNEL("info") );
-    rlog::SyslogNode *logNode = NULL;
 
     rlog::StdioNode* stdErr = new rlog::StdioNode(STDERR_FILENO);
     stdErr->subscribeTo( RLOG_CHANNEL("critical") );
@@ -294,55 +295,6 @@ int main(int argc, char *argv[])
 
 
     umask(0);
-    fuse_operations loggedFS_oper;
-    // in case this code is compiled against a newer FUSE library and new
-    // members have been added to fuse_operations, make sure they get set to
-    // 0..
-    std::fill((char*)&loggedFS_oper, ((char*)&loggedFS_oper) + sizeof(loggedFS_oper), '\0');
-    loggedFS_oper.init		= FSOperations::init;
-    loggedFS_oper.getattr	= FSOperations::getattr;
-    loggedFS_oper.access	= FSOperations::access;
-    loggedFS_oper.readlink	= FSOperations::readlink;
-    loggedFS_oper.readdir	= FSOperations::readdir;
-    loggedFS_oper.opendir        = FSOperations::opendir;
-    loggedFS_oper.releasedir     = FSOperations::releasedir;
-    loggedFS_oper.mknod	= FSOperations::mknod;
-    loggedFS_oper.mkdir	= FSOperations::mkdir;
-    loggedFS_oper.symlink	= FSOperations::symlink;
-    loggedFS_oper.unlink	= FSOperations::unlink;
-    loggedFS_oper.rmdir	= FSOperations::rmdir;
-    loggedFS_oper.rename	= FSOperations::rename;
-    loggedFS_oper.link	= FSOperations::link;
-    loggedFS_oper.chmod	= FSOperations::chmod;
-    loggedFS_oper.chown	= FSOperations::chown;
-    loggedFS_oper.truncate	= FSOperations::truncate;
-#if (FUSE_USE_VERSION==25)
-    loggedFS_oper.utime       = FSOperations::utime;
-#else
-    loggedFS_oper.utimens	= FSOperations::utimens;
-#endif
-    loggedFS_oper.read_buf       = FSOperations::read_buf;
-    loggedFS_oper.write_buf      = FSOperations::write_buf;
-    loggedFS_oper.flush          = FSOperations::flush;
-    loggedFS_oper.open	= FSOperations::open;
-    loggedFS_oper.read	= FSOperations::read;
-    loggedFS_oper.write	= FSOperations::write;
-    loggedFS_oper.statfs	= FSOperations::statfs;
-    loggedFS_oper.release	= FSOperations::release;
-    loggedFS_oper.fsync	= FSOperations::fsync;
-
-#ifdef HAVE_POSIX_FALLOCATE
-    loggedFS_oper.fallocate      = FSOperations::fallocate,
-#endif
-#ifdef HAVE_SETXATTR
-    loggedFS_oper.setxattr	= FSOperations::setxattr;
-    loggedFS_oper.getxattr	= FSOperations::getxattr;
-    loggedFS_oper.listxattr	= FSOperations::listxattr;
-    loggedFS_oper.removexattr= FSOperations::removexattr;
-#endif
-    //loggedFS_oper.lock           = FSOperations::lock;
-    loggedFS_oper.flock          = FSOperations::flock;
-
 
     if (processArgs(argc, argv, Globals::instance()->loggedfsArgs))
     {
@@ -364,6 +316,10 @@ int main(int argc, char *argv[])
             stdErr = NULL;
     		delete stdLog;
     		stdLog = NULL;
+        }
+        else if(Globals::instance()->fileLog!=-1){
+        	delete stdLog;
+        	stdLog = NULL;
         }
 
         //rLog(Globals::instance()->Info, "LoggedFS starting at %s.", Globals::instance()->loggedfsArgs->mountPoint.c_str());
@@ -394,10 +350,10 @@ int main(int argc, char *argv[])
 
 #if (FUSE_USE_VERSION<=25)
         fuse_main(Globals::instance()->loggedfsArgs->fuseArgv.size(),
-                  const_cast<char**>(&Globals::instance()->loggedfsArgs->fuseArgv[0]), &loggedFS_oper);
+                  const_cast<char**>(&Globals::instance()->loggedfsArgs->fuseArgv[0]), &FSOperations::getFuseOperations());
 #else
 	 fuse_main(Globals::instance()->loggedfsArgs->fuseArgv.size(),
-                  const_cast<char**>(&Globals::instance()->loggedfsArgs->fuseArgv[0]), &loggedFS_oper, NULL);
+                  const_cast<char**>(&Globals::instance()->loggedfsArgs->fuseArgv[0]), &FSOperations::getFuseOperations(), NULL);
 #endif
 	    if(stdLog!=NULL)
 	    {

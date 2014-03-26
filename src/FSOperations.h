@@ -20,6 +20,7 @@ public:
     enum Operations{
     	OP_NONE=0,
 
+    	OP_FGETATTR,
 	    OP_GETATTR,
 	    OP_ACCESS,
 	    OP_READLINK,
@@ -35,29 +36,39 @@ public:
 		OP_LINK,
 		OP_CHMOD,
 		OP_CHOWN,
+		OP_FTRUNCATE,
 		OP_TRUNCATE,
-		OP_UTIME,
+		OP_UTIME, // deprecated
 		OP_UTIMENS,
 		OP_READ_BUF,
 		OP_WRITE_BUF,
 		OP_FLUSH,
+		OP_CREATE,
 		OP_OPEN,
 		OP_READ,
 		OP_WRITE,
 		OP_STATFS,
 		OP_RELEASE,
 		OP_FSYNC,
+		OP_FSYNCDIR,
 		OP_FALLOCATE,
 		OP_SETXATTR,
 		OP_GETXATTR,
 		OP_LISTXATTR,
 		OP_REMOVEXATTR,
-		//OP_LOCK,
-		OP_FLOCK
+		OP_LOCK,
+		OP_FLOCK,
+
+		OP_BMAP,
+		OP_IOCTL,
+		OP_POLL
     };
+
+    template <int N> static int proxy(const char *path, ...);
 
 	static void* init(struct fuse_conn_info* info);
 
+	static int fgetattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi);
 	static int getattr(const char *path, struct stat *stbuf);
 	static int access(const char *path, int mask);
 	static int readlink(const char *path, char *buf, size_t size);
@@ -73,13 +84,12 @@ public:
 	static int link(const char *from, const char *to);
 	static int chmod(const char *path, mode_t mode);
 	static int chown(const char *path, uid_t uid, gid_t gid);
+	static int ftruncate(const char *path, off_t size, struct fuse_file_info *fi);
 	static int truncate(const char *path, off_t size);
-	#if (FUSE_USE_VERSION==25)
-	static int utime(const char *path, struct utimbuf *buf);
-	#else
-	static int utimens(const char *path, const struct timespec ts[2]);
-	#endif
 
+	static int utimens(const char *path, const struct timespec ts[2]);
+
+	static int create(const char *path, mode_t mode, struct fuse_file_info *fi);
 	static int open(const char *path, struct fuse_file_info *fi);
 	static int read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
 	static int write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
@@ -88,24 +98,29 @@ public:
 	static int flush(const char *path, struct fuse_file_info *fi);
 	static int statfs(const char *path, struct statvfs *stbuf);
 	static int release(const char *path, struct fuse_file_info *fi);
-	static int fsync(const char *path, int isdatasync, struct fuse_file_info *fi);
 
-	#ifdef HAVE_SETXATTR
-	/* xattr operations are optional and can safely be left unimplemented */
+	static int fsync(const char *path, int isdatasync, struct fuse_file_info *fi);
+	static int fsyncdir(const char *path, int isdatasync, struct fuse_file_info *fi);
+
 	static int setxattr(const char *path, const char *name, const char *value, size_t size, int flags);
 	static int getxattr(const char *path, const char *name, char *value, size_t size);
 	static int listxattr(const char *path, char *list, size_t size);
 	static int removexattr(const char *path, const char *name);
-	#endif /* HAVE_SETXATTR */
 
 
 	//static int lock(const char *path, struct fuse_file_info *fi, int cmd, struct flock *lock);
 
 	static int flock(const char *path, struct fuse_file_info *fi, int op);
-	#ifdef HAVE_POSIX_FALLOCATE
 	static int fallocate(const char *path, int mode,
 							off_t offset, off_t length, struct fuse_file_info *fi);
-	#endif
+
+	static int bmap(const char *, size_t blocksize, uint64_t *idx);
+	static int ioctl(const char *, int cmd, void *arg,
+		      struct fuse_file_info *, unsigned int flags, void *data);
+	static int poll(const char *, struct fuse_file_info *,
+		     struct fuse_pollhandle *ph, unsigned *reventsp);
+
+	static fuse_operations& getFuseOperations();
 
 }; // END OF CLASS FSOperations
 

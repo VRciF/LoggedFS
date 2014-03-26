@@ -191,11 +191,10 @@ bool Config::fuzzyShouldLog(int action)
 			Filter f=includes[i];
 			if (f.matches(FSOperations::actions[action],f.getAction())){
 				shallnotlog[action] = false;
-				break;
+				return false;
 			}
 		}
 	}
-	if(shallnotlog[action]) return false;
 
 	return true;
 }
