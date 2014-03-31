@@ -1,16 +1,27 @@
 #ifndef LOGGEDFS_GLOBALS_H
 #define LOGGEDFS_GLOBALS_H
 
-#include <rlog/rlog.h>
-#include <rlog/Error.h>
-#include <rlog/RLogChannel.h>
-#include <rlog/SyslogNode.h>
-#include <rlog/StdioNode.h>
-
 #include <vector>
 
 #include "Config.h"
 #include "Format.h"
+
+#include "cpplog/cpplog.hpp"
+/*
+class NullLogger : public cpplog::BaseLogger
+{
+public:
+	NullLogger()
+	{ }
+
+	virtual bool sendLogMessage(cpplog::LogData* logData)
+	{
+		return true;
+	}
+
+	virtual ~NullLogger() { }
+};
+*/
 
 class Globals{
 public:
@@ -20,33 +31,26 @@ public:
 		std::string configFilename;
 		bool isDaemon; // true == spawn in background, log to syslog
 		std::vector<const char*> fuseArgv;
-
-		//const char *fuseArgv[MaxFuseArgs];
-		//int fuseArgc;
 	};
 
 	LoggedFS_Args *loggedfsArgs;
 
-	rlog::RLogChannel *Info;
-	rlog::StdioNode* fileLogNode;
-
 	Config config;
 	int savefd;
 	std::string logfilename;
-	int fileLog;
+	__gnu_cxx::stdio_filebuf<char> *filebuf;
 
-	//const int MaxFuseArgs;
+	cpplog::BaseLogger *logger;
+	cpplog::StdErrLogger errlog;
 
 	static Globals* instance(){
 		static Globals *i = NULL;
 		if(i==NULL){
 			i = new Globals();
 
+			i->filebuf = NULL;
 			i->loggedfsArgs = new LoggedFS_Args;
-			i->Info = DEF_CHANNEL("info", rlog::Log_Info);
-			i->fileLog = -1;
-			i->fileLogNode = NULL;
-			//i->MaxFuseArgs = 32;
+			i->logger = new cpplog::OstreamLogger(std::cout);
 		}
 		return i;
 	}

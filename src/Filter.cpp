@@ -19,12 +19,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <rlog/rlog.h>
-#include <rlog/Error.h>
-#include <rlog/RLogChannel.h>
-#include <rlog/SyslogNode.h>
-#include <rlog/StdioNode.h>
-
 #include <string>
 #include <sstream>
 
@@ -72,7 +66,7 @@ bool Filter::matches( const std::string &str, const std::string &pattern)
 
     if (re == NULL)
     {
-        rError("PCRE compilation failed at offset %d: %s\n", erroffset, error);
+    	LOG_ERROR(Globals::instance()->errlog) << "PCRE compilation failed at offset " << erroffset << ": "<< error << std::endl;
         return false;
     }
 

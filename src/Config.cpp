@@ -21,12 +21,6 @@
 #include <iostream>
 
 
-#include <rlog/rlog.h>
-#include <rlog/Error.h>
-#include <rlog/RLogChannel.h>
-#include <rlog/SyslogNode.h>
-#include <rlog/StdioNode.h>
-
 xmlChar* INCLUDE=xmlCharStrdup("include");
 xmlChar* EXCLUDE=xmlCharStrdup("exclude");
 xmlChar* USER=xmlCharStrdup("uid");
@@ -40,6 +34,7 @@ xmlChar* FORMAT=xmlCharStrdup("format");
 
 #include "Format.h"
 #include "FSOperations.h"
+#include "Globals.h"
 
 Config::Config()
 {
@@ -67,29 +62,31 @@ void Config::parse(xmlNode * a_node)
 			{
 			while (attr!=NULL)
 				{
-				if (xmlStrcmp(attr->name,LOG_ENABLED)==0)
-					{
-					//enable or disable loggedfs
-					if (xmlStrcmp(attr->children->content,xmlCharStrdup("true"))!=0)
+					if (xmlStrcmp(attr->name,LOG_ENABLED)==0)
 						{
-						enabled=false;
+						//enable or disable loggedfs
+						if (xmlStrcmp(attr->children->content,xmlCharStrdup("true"))!=0)
+							{
+							enabled=false;
+							}
 						}
-					}
-				else if (xmlStrcmp(attr->name,PNAME_ENABLED)==0)
-					{
-					//enable or disable process name prints in loggedfs
-					if (xmlStrcmp(attr->children->content,xmlCharStrdup("true"))!=0)
+					else if (xmlStrcmp(attr->name,PNAME_ENABLED)==0)
 						{
-						pNameEnabled=false;
+						//enable or disable process name prints in loggedfs
+						if (xmlStrcmp(attr->children->content,xmlCharStrdup("true"))!=0)
+							{
+							pNameEnabled=false;
+							}
 						}
-					}
-				else if (xmlStrcmp(attr->name,FORMAT)==0)
-					{
-						//default format loggedfs
-						this->defaultformat = Format((const char*)attr->children->content);
-					}
-				else rError("unknown attribute : %s\n",attr->name);
-				attr=attr->next;
+					else if (xmlStrcmp(attr->name,FORMAT)==0)
+						{
+							//default format loggedfs
+							this->defaultformat = Format((const char*)attr->children->content);
+						}
+					else
+						LOG_ERROR(Globals::instance()->errlog) << "unknown attribute " << attr->name << std::endl;
+
+				    attr=attr->next;
 				}
 			}
 		if (xmlStrcmp(cur_node->name,INCLUDE)==0 || xmlStrcmp(cur_node->name,EXCLUDE)==0)
@@ -99,33 +96,35 @@ void Config::parse(xmlNode * a_node)
 			std::string buffer;
 			while (attr!=NULL)
 				{
-				buffer = std::string((char*)attr->children->content);
+					buffer = std::string((char*)attr->children->content);
 
-				if (xmlStrcmp(attr->name,EXTENSION)==0)
-					{
-					filter->setExtension(buffer);
-					}
-				else if (xmlStrcmp(attr->name,USER)==0)
-					{
-					if (buffer.compare("*")!=0)
-						filter->setUID(atoi(buffer.c_str()));
-					else filter->setUID(-1); // every users
+					if (xmlStrcmp(attr->name,EXTENSION)==0)
+						{
+						filter->setExtension(buffer);
+						}
+					else if (xmlStrcmp(attr->name,USER)==0)
+						{
+						if (buffer.compare("*")!=0)
+							filter->setUID(atoi(buffer.c_str()));
+						else filter->setUID(-1); // every users
 
-					}
-				else if (xmlStrcmp(attr->name,ACTION)==0)
-					{
-					filter->setAction(buffer);
-					}
-				else if (xmlStrcmp(attr->name,RETNAME)==0)
-					{
-					filter->setRetname(buffer);
-					}
-				else if (xmlStrcmp(attr->name,FORMAT)==0)
-					{
-					filter->setFormat(buffer);
-					}
-				else rError("unknown attribute : %s\n",attr->name);
-				attr=attr->next;
+						}
+					else if (xmlStrcmp(attr->name,ACTION)==0)
+						{
+						filter->setAction(buffer);
+						}
+					else if (xmlStrcmp(attr->name,RETNAME)==0)
+						{
+						filter->setRetname(buffer);
+						}
+					else if (xmlStrcmp(attr->name,FORMAT)==0)
+						{
+						filter->setFormat(buffer);
+						}
+					else
+						LOG_ERROR(Globals::instance()->errlog) << "unknown attribute " << attr->name << std::endl;
+
+				    attr=attr->next;
 				}
 			
 			if (xmlStrcmp(cur_node->name,INCLUDE)==0)

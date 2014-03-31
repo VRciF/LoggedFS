@@ -1,6 +1,6 @@
 CC=g++
-CFLAGS=-Wall -ansi -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -DRLOG_COMPONENT="loggedfs" `xml2-config --cflags`
-LDFLAGS=-Wall -ansi -lpcre -lfuse -lrlog `xml2-config --libs`
+CFLAGS=-Wall -Wpedantic -ansi -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 `xml2-config --cflags` -g -ggdb
+LDFLAGS=-Wall -Wpedantic -ansi -lpcre -lfuse `xml2-config --libs` -g -ggdb
 srcdir=src
 builddir=build
 
@@ -9,15 +9,22 @@ all: $(builddir) loggedfs
 $(builddir):
 	mkdir $(builddir)
 
-loggedfs: $(builddir)/loggedfs.o $(builddir)/Config.o $(builddir)/Filter.o
-	$(CC) -o loggedfs $(builddir)/loggedfs.o $(builddir)/Config.o $(builddir)/Filter.o $(LDFLAGS)
-$(builddir)/loggedfs.o: $(builddir)/Config.o $(builddir)/Filter.o $(srcdir)/loggedfs.cpp
+loggedfs: $(builddir)/loggedfs.o $(builddir)/FSOperations.o $(builddir)/Format.o $(builddir)/Config.o $(builddir)/Filter.o
+	$(CC) -o loggedfs $(builddir)/loggedfs.o $(builddir)/FSOperations.o $(builddir)/Format.o $(builddir)/Config.o $(builddir)/Filter.o $(LDFLAGS)
+
+$(builddir)/loggedfs.o:
 	$(CC) -o $(builddir)/loggedfs.o -c $(srcdir)/loggedfs.cpp $(CFLAGS)
 
-$(builddir)/Config.o: $(builddir)/Filter.o $(srcdir)/Config.cpp $(srcdir)/Config.h
+$(builddir)/FSOperations.o:
+	$(CC) -o $(builddir)/FSOperations.o -c $(srcdir)/FSOperations.cpp $(CFLAGS)
+
+$(builddir)/Format.o:
+	$(CC) -o $(builddir)/Format.o -c $(srcdir)/Format.cpp $(CFLAGS)
+
+$(builddir)/Config.o:
 	$(CC) -o $(builddir)/Config.o -c $(srcdir)/Config.cpp $(CFLAGS)
 
-$(builddir)/Filter.o: $(srcdir)/Filter.cpp $(srcdir)/Filter.h
+$(builddir)/Filter.o:
 	$(CC) -o $(builddir)/Filter.o -c $(srcdir)/Filter.cpp $(CFLAGS)
 
 clean:

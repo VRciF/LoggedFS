@@ -1,12 +1,6 @@
 #ifndef LOGGEDFS_UTIL_H
 #define LOGGEDFS_UTIL_H
 
-#include <rlog/rlog.h>
-#include <rlog/Error.h>
-#include <rlog/RLogChannel.h>
-#include <rlog/SyslogNode.h>
-#include <rlog/StdioNode.h>
-
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
@@ -18,7 +12,6 @@
 
 class Util{
   public:
-
 	static bool isAbsolutePath( const std::string fileName )
 	{
 	    if(fileName.length()>0 && fileName[0] != '\0' && fileName[0] == '/')
@@ -145,7 +138,7 @@ class Util{
 			std::string message;
 			f->render(values, message);
 
-			rLog(Globals::instance()->Info, message.c_str());
+            cpplog::LogMessage(__FILE__, __LINE__, (LL_INFO), *Globals::instance()->logger, false).getStream() << message << std::endl;
 	    }
 	}
 

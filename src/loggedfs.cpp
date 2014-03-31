@@ -38,11 +38,7 @@
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
-#include <rlog/rlog.h>
-#include <rlog/Error.h>
-#include <rlog/RLogChannel.h>
-#include <rlog/SyslogNode.h>
-#include <rlog/StdioNode.h>
+
 #include <stdarg.h>
 #include <getopt.h>
 #include <sys/time.h>
@@ -58,73 +54,20 @@
 #include <iostream>
 #include <sstream>
 #include <map>
+#include <ext/stdio_filebuf.h>
+
+#include "cpplog/cpplog.hpp"
 
 #include "Config.h"
 #include "FSOperations.h"
 #include "Util.h"
 #include "Globals.h"
 
-class LoggedFSRLogNode : public rlog::StdioNode{
-    public:
-	    LoggedFSRLogNode(int _fdOut = 2, int flags = (int)DefaultOutput)
-			: StdioNode()
-			, fdOut( _fdOut )
-		{
-			if(flags == DefaultOutput)
-			flags = OutputColor | OutputContext;
-
-		#ifdef USE_COLOURS
-			colorize = (flags & OutputColor) && isatty( fdOut );
-		#else
-			colorize = false;
-		#endif
-			outputThreadId = (flags & OutputThreadId);
-			outputContext   = (flags & OutputContext);
-			outputChannel   = (flags & OutputChannel);
-		}
-
-	    LoggedFSRLogNode(int _fdOut, bool colorizeIfTTY)
-			: StdioNode()
-			, fdOut( _fdOut )
-		{
-		#ifdef USE_COLOURS
-			colorize = colorizeIfTTY && isatty( fdOut );
-		#else
-			(void)colorizeIfTTY;
-			colorize = false;
-		#endif
-			outputThreadId = false;
-			outputContext  = true;
-			outputChannel  = false;
-		}
-
-		virtual ~LoggedFSRLogNode()
-		{
-		}
-	protected:
-		virtual void publish( const rlog::RLogData &data )
-		{
-		#ifdef USE_STRSTREAM
-			std::ostrstream ss;
-		#else
-			std::ostringstream ss;
-		#endif
-
-			ss << data.msg;
-			ss << '\n';
-
-			string out = ss.str();
-			::write( fdOut, out.c_str(), out.length() );
-		}
-
-	    int fdOut;
-};
-
 static void usage(char *name)
 {
-     rError("Usage:\n");
-     rError("%s [-h] | [-l log-file] [-c config-file] [-f] [-p] [-e] /directory-mountpoint\n",name);
-     rError("Type 'man loggedfs' for more details\n");
+	LOG_ERROR(Globals::instance()->errlog) << "Usage:" << std::endl;
+	LOG_ERROR(Globals::instance()->errlog) << name << " [-h] | [-l log-file] [-c config-file] [-f] [-p] [-e] [/]directory-mountpoint" << std::endl;
+     //LOG_ERROR(Globals::instance()->errlog) << "Type 'man loggedfs' for more details" << std::endl;
      return;
 }
 
@@ -169,29 +112,45 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
             out->isDaemon = false;
             // this option was added in fuse 2.x
             out->fuseArgv.push_back("-f");
-	    	//rLog(Globals::instance()->Info,"LoggedFS not running as a daemon");
+	    	LOG_INFO(Globals::instance()->errlog) << "LoggedFS not running as a daemon" << std::endl;
             break;
         case 'p':
             out->fuseArgv.push_back("-o");
             out->fuseArgv.push_back("allow_other,default_permissions," COMMON_OPTS);
             got_p = true; 
-            //rLog(Globals::instance()->Info,"LoggedFS running as a public filesystem");
+            LOG_INFO(Globals::instance()->errlog) << "LoggedFS running as a public filesystem" << std::endl;
             break;
         case 'e':
             out->fuseArgv.push_back("-o");
             out->fuseArgv.push_back("nonempty");
-            //rLog(Globals::instance()->Info,"Using existing directory");
+            LOG_INFO(Globals::instance()->errlog) << "Using existing directory" << std::endl;
             break;
         case 'c':
             out->configFilename=optarg;
-	    	//rLog(Globals::instance()->Info,"Configuration file : %s",optarg);
+            LOG_INFO(Globals::instance()->errlog) << "Configuration file : " << optarg << std::endl;
             break;
         case 'l':
-        	Globals::instance()->logfilename = std::string(optarg);
-        	Globals::instance()->fileLog=open(Globals::instance()->logfilename.c_str(),O_WRONLY|O_CREAT|O_APPEND , S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-        	Globals::instance()->fileLogNode=new LoggedFSRLogNode(Globals::instance()->fileLog);
-        	Globals::instance()->fileLogNode->subscribeTo( RLOG_CHANNEL("info") );
-	    	//rLog(Globals::instance()->Info,"LoggedFS log file : %s",optarg);
+            {
+				Globals::instance()->logfilename = std::string(optarg);
+				int fd = open(Globals::instance()->logfilename.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+				if(fd == -1){
+					LOG_ERROR(Globals::instance()->errlog) << "Could not open log file: "<< optarg << "- {"
+							                               << errno << ":"<< strerror(errno) << "}" << std::endl;
+					return false;
+				}
+
+				__gnu_cxx::stdio_filebuf<char> *fb = new __gnu_cxx::stdio_filebuf<char>(fd, std::ios::out);
+				if(Globals::instance()->filebuf != NULL){
+					delete Globals::instance()->filebuf;
+				}
+				Globals::instance()->filebuf = fb;
+
+				if(Globals::instance()->logger!=NULL){
+					delete Globals::instance()->logger;
+				}
+				std::ostream *os = new std::ostream(Globals::instance()->filebuf);
+				Globals::instance()->logger = new cpplog::OstreamLogger(*os);
+            }
             break;
 
         default:
@@ -215,7 +174,7 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
     }
     else
     {
-        rError("Missing mountpoint");
+    	LOG_ERROR(Globals::instance()->errlog) << "Missing mountpoint" << std::endl;
 	    usage(argv[0]);
         return false;
     }
@@ -232,7 +191,7 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
     }
 
     if(out->mountPoint.length()<=0){
-    	rError("invalid (none) mountpoint given");
+    	LOG_ERROR(Globals::instance()->errlog) << "invalid (none) mountpoint given" << std::endl;
 	    usage(argv[0]);
         return false;
     }
@@ -240,7 +199,7 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
     {
     	char *tmpc = getcwd(NULL, 0);
     	if(tmpc==NULL){
-    		rError("Could not get current working directory (getcwd:%d)", errno);
+    		LOG_ERROR(Globals::instance()->errlog) << "Could not get current working directory (getcwd:"<<errno<<")" << std::endl;
     		return false;
     	}
     	std::string tmppath(tmpc);
@@ -251,7 +210,8 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
 
     	tmpc = realpath(tmppath.c_str() ,NULL);
     	if(tmpc==NULL){
-    		rError("Could not get absolute mount point directory (realpath:%d) for %s", errno, out->mountPoint.c_str());
+    		LOG_ERROR(Globals::instance()->errlog) << "Could not get absolute mount point directory (realpath:"<< errno <<") for "
+    				                               << out->mountPoint.c_str() << std::endl;
     		return false;
     	}
     	out->mountPoint = std::string(tmpc);
@@ -266,68 +226,30 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
 // the logfile there is now a support for logrotate
 void reopenLogFile (int param)
 {
-	if(Globals::instance()->fileLog==-1 || Globals::instance()->logfilename.length()<=0) return;
+	if(Globals::instance()->filebuf==NULL || !Globals::instance()->filebuf->is_open() || Globals::instance()->logfilename.length()<=0) return;
 
-    int reopenfd = ::open(Globals::instance()->logfilename.c_str(), O_RDWR | O_APPEND | O_CREAT);
+    int reopenfd = ::open(Globals::instance()->logfilename.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
     if(reopenfd != -1){
-    	::dup2(reopenfd, Globals::instance()->fileLog);
+    	::dup2(reopenfd, Globals::instance()->filebuf->fd());
     }
 }
 
 int main(int argc, char *argv[])
 {
 	Globals::instance()->instance();
-    rlog::RLogInit( argc, argv );
-
-    rlog::SyslogNode *logNode = NULL;
-
-    rlog::StdioNode* stdLog = new LoggedFSRLogNode(STDOUT_FILENO);
-    stdLog->subscribeTo( RLOG_CHANNEL("info") );
-
-    rlog::StdioNode* stdErr = new rlog::StdioNode(STDERR_FILENO);
-    stdErr->subscribeTo( RLOG_CHANNEL("critical") );
-    stdErr->subscribeTo( RLOG_CHANNEL("error") );
-    stdErr->subscribeTo( RLOG_CHANNEL("warning") );
-    stdErr->subscribeTo( RLOG_CHANNEL("notice") );
-    stdErr->subscribeTo( RLOG_CHANNEL("debug") );
 
     signal (SIGHUP, reopenLogFile);
-
 
     umask(0);
 
     if (processArgs(argc, argv, Globals::instance()->loggedfsArgs))
     {
-        if (Globals::instance()->loggedfsArgs->isDaemon)
-        {
-        	logNode = new rlog::SyslogNode( "loggedfs" );
-        	logNode->subscribeTo( RLOG_CHANNEL("critical") );
-        	logNode->subscribeTo( RLOG_CHANNEL("error") );
-        	logNode->subscribeTo( RLOG_CHANNEL("warning") );
-        	logNode->subscribeTo( RLOG_CHANNEL("notice") );
-        	logNode->subscribeTo( RLOG_CHANNEL("debug") );
-
-        	if(Globals::instance()->fileLog==-1){
-        		logNode->subscribeTo( RLOG_CHANNEL("info") );
-        	}
-
-            // disable stderr reporting..
-            delete stdErr;
-            stdErr = NULL;
-    		delete stdLog;
-    		stdLog = NULL;
-        }
-        else if(Globals::instance()->fileLog!=-1){
-        	delete stdLog;
-        	stdLog = NULL;
-        }
-
-        //rLog(Globals::instance()->Info, "LoggedFS starting at %s.", Globals::instance()->loggedfsArgs->mountPoint.c_str());
+    	LOG_INFO(Globals::instance()->errlog) << "LoggedFS starting at " << Globals::instance()->loggedfsArgs->mountPoint.c_str() << std::endl;
 
         if(Globals::instance()->loggedfsArgs->configFilename.length()>0){
             if (Globals::instance()->loggedfsArgs->configFilename.compare("-")==0)
             {
-                //rLog(Globals::instance()->Info, "Using stdin configuration");
+            	LOG_INFO(Globals::instance()->errlog) << "Using stdin configuration" << std::endl;
                 std::string input;
                 char c;
                 while (cin.get(c))
@@ -339,12 +261,12 @@ int main(int argc, char *argv[])
             }
             else
             {
-                //rLog(Globals::instance()->Info, "Using configuration file %s.",Globals::instance()->loggedfsArgs->configFilename.c_str());
+            	LOG_INFO(Globals::instance()->errlog) <<  "Using configuration file " << Globals::instance()->loggedfsArgs->configFilename.c_str() << std::endl;
                 Globals::instance()->config.loadFromXmlFile(Globals::instance()->loggedfsArgs->configFilename);
             }
         }
 
-        //rLog(Globals::instance()->Info,"chdir to %s",Globals::instance()->loggedfsArgs->mountPoint.c_str());
+        LOG_INFO(Globals::instance()->errlog) << "chdir to " << Globals::instance()->loggedfsArgs->mountPoint.c_str() << std::endl;
         ::chdir(Globals::instance()->loggedfsArgs->mountPoint.c_str());
         Globals::instance()->savefd = open(".", 0);
 
@@ -355,33 +277,16 @@ int main(int argc, char *argv[])
 	 fuse_main(Globals::instance()->loggedfsArgs->fuseArgv.size(),
                   const_cast<char**>(&Globals::instance()->loggedfsArgs->fuseArgv[0]), &FSOperations::getFuseOperations(), NULL);
 #endif
-	    if(stdLog!=NULL)
-	    {
-            delete stdLog;
-            stdLog = NULL;
-        }
-		if(stdErr!=NULL)
-		{
-			delete stdErr;
-		    stdErr = NULL;
-		}
-        if (Globals::instance()->fileLog!=-1)
+        if (Globals::instance()->filebuf!=NULL)
         {
-            delete Globals::instance()->fileLogNode;
-            Globals::instance()->fileLogNode=NULL;
-            close(Globals::instance()->fileLog);
+        	if(Globals::instance()->filebuf->is_open())
+        	    Globals::instance()->filebuf->close();
+        	delete Globals::instance()->filebuf;
         }
-        if (Globals::instance()->loggedfsArgs->isDaemon)
+        if (Globals::instance()->logger!=NULL)
         {
-            delete logNode;
-            logNode=NULL;
+        	delete Globals::instance()->logger;
+        	Globals::instance()->logger = NULL;
         }
-        //rLog(Globals::instance()->Info,"LoggedFS closing.");
     }
 }
-/*
- * missing ops
-//int(* 	bmap )(const char *, size_t blocksize, uint64_t *idx)
-//int(* 	ioctl )(const char *, int cmd, void *arg, struct fuse_file_info *, unsigned int flags, void *data)
-//int(* 	poll )(const char *, struct fuse_file_info *, struct fuse_pollhandle *ph, unsigned *reventsp)
- * */
