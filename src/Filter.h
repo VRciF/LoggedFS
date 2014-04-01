@@ -19,6 +19,8 @@
 
 #include <unistd.h>
 
+#include <pcre.h>
+
 #include <string>
 #include <map>
 
@@ -34,7 +36,7 @@ public:
 	std::string getAction();
 	std::string getRetname();
 	Format& getFormat();
-	
+
 	void setExtension(const std::string e);
 	void setUID(int u);
 	void setAction(const std::string a);
@@ -42,7 +44,14 @@ public:
 	void setFormat(const std::string f);
 	void setFormat(const Format f);
 	bool matches(const std::string path, int uid, const std::string action, const std::string retname);
-	static bool matches( const std::string &str,const std::string &pattern);
+
+	bool matchPath(const std::string path);
+	bool matchUid(int uid);
+	bool matchAction(const std::string action);
+	bool matchRetname(const std::string retname);
+private:
+	pcre* compileRegex(const std::string &pattern);
+	bool matches( const std::string &str, pcre *re);
 
 private:
 	std::string extension;
@@ -50,6 +59,8 @@ private:
 	std::string action;
 	std::string retname;
 	Format format;
+
+	pcre *regex_extension, *regex_action, *regex_retname;
 };
 
 

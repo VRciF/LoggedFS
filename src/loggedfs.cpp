@@ -54,7 +54,7 @@
 #include <iostream>
 #include <sstream>
 #include <map>
-#include <ext/stdio_filebuf.h>
+#include <algorithm>
 
 #include "cpplog/cpplog.hpp"
 
@@ -65,9 +65,10 @@
 
 static void usage(char *name)
 {
-	LOG_ERROR(Globals::instance()->errlog) << "Usage:" << std::endl;
-	LOG_ERROR(Globals::instance()->errlog) << name << " [-h] | [-l log-file] [-c config-file] [-f] [-p] [-e] [/]directory-mountpoint" << std::endl;
-     //LOG_ERROR(Globals::instance()->errlog) << "Type 'man loggedfs' for more details" << std::endl;
+	LOGGEDFS_ERROR(Globals::instance()->errlog) << "Usage:" << std::endl;
+	LOGGEDFS_ERROR(Globals::instance()->errlog) << name << " [-h] | [-l log-file] [-c config-file] [-i INCLUDE] [-x EXCLUDE] [-f] [-p] [-e] [/]directory-mountpoint" << std::endl;
+	LOGGEDFS_ERROR(Globals::instance()->errlog) << "INCLUDE/EXCLUDE format is given as key value pair like the following: [extension:.*;][action:getattr;][retname:.*;][uid:*;][format:FORMAT;]" << std::endl;
+     //LOGGEDFS_ERROR(Globals::instance()->errlog) << "Type 'man loggedfs' for more details" << std::endl;
      return;
 }
 
@@ -101,61 +102,95 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
 
 #define COMMON_OPTS "nonempty,use_ino"
 
-    while ((res = getopt (argc, argv, "hpfec:l:")) != -1)
+    while ((res = getopt (argc, argv, "hpfec:l:i:x:m:")) != -1)
     {
         switch (res)
         {
-	case 'h':
-            usage(argv[0]);
-            return false;
-        case 'f':
-            out->isDaemon = false;
-            // this option was added in fuse 2.x
-            out->fuseArgv.push_back("-f");
-	    	LOG_INFO(Globals::instance()->errlog) << "LoggedFS not running as a daemon" << std::endl;
-            break;
-        case 'p':
-            out->fuseArgv.push_back("-o");
-            out->fuseArgv.push_back("allow_other,default_permissions," COMMON_OPTS);
-            got_p = true; 
-            LOG_INFO(Globals::instance()->errlog) << "LoggedFS running as a public filesystem" << std::endl;
-            break;
-        case 'e':
-            out->fuseArgv.push_back("-o");
-            out->fuseArgv.push_back("nonempty");
-            LOG_INFO(Globals::instance()->errlog) << "Using existing directory" << std::endl;
-            break;
-        case 'c':
-            out->configFilename=optarg;
-            LOG_INFO(Globals::instance()->errlog) << "Configuration file : " << optarg << std::endl;
-            break;
-        case 'l':
-            {
-				Globals::instance()->logfilename = std::string(optarg);
-				int fd = open(Globals::instance()->logfilename.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
-				if(fd == -1){
-					LOG_ERROR(Globals::instance()->errlog) << "Could not open log file: "<< optarg << "- {"
-							                               << errno << ":"<< strerror(errno) << "}" << std::endl;
-					return false;
+			case 'h':
+				usage(argv[0]);
+				return false;
+			case 'f':
+				out->isDaemon = false;
+				// this option was added in fuse 2.x
+				out->fuseArgv.push_back("-f");
+				LOG_INFO(Globals::instance()->errlog) << "LoggedFS not running as a daemon" << std::endl;
+				break;
+			case 'p':
+				out->fuseArgv.push_back("-o");
+				out->fuseArgv.push_back("allow_other,default_permissions," COMMON_OPTS);
+				got_p = true;
+				LOG_INFO(Globals::instance()->errlog) << "LoggedFS running as a public filesystem" << std::endl;
+				break;
+			case 'e':
+				out->fuseArgv.push_back("-o");
+				out->fuseArgv.push_back("nonempty");
+				LOG_INFO(Globals::instance()->errlog) << "Using existing directory" << std::endl;
+				break;
+			case 'c':
+				out->configFilename=optarg;
+				LOG_INFO(Globals::instance()->errlog) << "Configuration file : " << optarg << std::endl;
+				break;
+			case 'l':
+				{
+					Globals::instance()->logfilename = std::string(optarg);
+					int fd = open(Globals::instance()->logfilename.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
+					if(fd == -1){
+						LOGGEDFS_ERROR(Globals::instance()->errlog) << "Could not open log file: "<< optarg << "- {"
+										    					    << errno << ":"<< strerror(errno) << "}" << std::endl;
+						return false;
+					}
+
+					__gnu_cxx::stdio_filebuf<char> *fb = new __gnu_cxx::stdio_filebuf<char>(fd, std::ios::out);
+					if(Globals::instance()->filebuf != NULL){
+						delete Globals::instance()->filebuf;
+					}
+					Globals::instance()->filebuf = fb;
+
+					if(Globals::instance()->logger!=NULL){
+						delete Globals::instance()->logger;
+					}
+					std::ostream *os = new std::ostream(Globals::instance()->filebuf);
+					Globals::instance()->logger = new cpplog::OstreamLogger(*os);
 				}
+				break;
+			case 'i':
+			case 'x':
+				{
+					std::string extension, action, retname, format, uid;
 
-				__gnu_cxx::stdio_filebuf<char> *fb = new __gnu_cxx::stdio_filebuf<char>(fd, std::ios::out);
-				if(Globals::instance()->filebuf != NULL){
-					delete Globals::instance()->filebuf;
+					std::map<std::string,std::string> keyvalue;
+					std::map<std::string,std::string>::iterator it;
+
+					std::string arg(optarg);
+
+					Util::parseStyleSheetFormat(keyvalue, arg);
+					for(it=keyvalue.begin();it!=keyvalue.end();++it){
+						std::string key = it->first;
+						std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+						if(key.compare("extension")==0 || key.compare("ext")==0)
+							extension = it->second;
+						if(key.compare("retname")==0 || key.compare("rnam")==0)
+							retname = it->second;
+						if(key.compare("action")==0 || key.compare("act")==0)
+							action = it->second;
+						if(key.compare("user")==0 || key.compare("uid")==0)
+							uid = it->second;
+						if(key.compare("format")==0 || key.compare("fmt")==0)
+							format = it->second;
+					}
+
+					if(res=='i')
+						Globals::instance()->config.addInclude(extension, uid, action, retname, format);
+					else
+						Globals::instance()->config.addExclude(extension, uid, action, retname);
 				}
-				Globals::instance()->filebuf = fb;
+				break;
+			case 'm':
+					Globals::instance()->config.setDefaultFormat(std::string(optarg));
+				break;
+			default:
 
-				if(Globals::instance()->logger!=NULL){
-					delete Globals::instance()->logger;
-				}
-				std::ostream *os = new std::ostream(Globals::instance()->filebuf);
-				Globals::instance()->logger = new cpplog::OstreamLogger(*os);
-            }
-            break;
-
-        default:
-
-            break;
+				break;
         }
     }
 
@@ -174,7 +209,7 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
     }
     else
     {
-    	LOG_ERROR(Globals::instance()->errlog) << "Missing mountpoint" << std::endl;
+    	LOGGEDFS_ERROR(Globals::instance()->errlog) << "Missing mountpoint" << std::endl;
 	    usage(argv[0]);
         return false;
     }
@@ -191,7 +226,7 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
     }
 
     if(out->mountPoint.length()<=0){
-    	LOG_ERROR(Globals::instance()->errlog) << "invalid (none) mountpoint given" << std::endl;
+    	LOGGEDFS_ERROR(Globals::instance()->errlog) << "invalid (none) mountpoint given" << std::endl;
 	    usage(argv[0]);
         return false;
     }
@@ -199,7 +234,7 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
     {
     	char *tmpc = getcwd(NULL, 0);
     	if(tmpc==NULL){
-    		LOG_ERROR(Globals::instance()->errlog) << "Could not get current working directory (getcwd:"<<errno<<")" << std::endl;
+    		LOGGEDFS_ERROR(Globals::instance()->errlog) << "Could not get current working directory (getcwd:"<<errno<<")" << std::endl;
     		return false;
     	}
     	std::string tmppath(tmpc);
@@ -210,8 +245,8 @@ bool processArgs(int argc, char *argv[], Globals::LoggedFS_Args *out)
 
     	tmpc = realpath(tmppath.c_str() ,NULL);
     	if(tmpc==NULL){
-    		LOG_ERROR(Globals::instance()->errlog) << "Could not get absolute mount point directory (realpath:"<< errno <<") for "
-    				                               << out->mountPoint.c_str() << std::endl;
+    		LOGGEDFS_ERROR(Globals::instance()->errlog) << "Could not get absolute mount point directory (realpath:"<< errno <<") for "
+    				                                    << out->mountPoint.c_str() << std::endl;
     		return false;
     	}
     	out->mountPoint = std::string(tmpc);

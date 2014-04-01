@@ -48,6 +48,10 @@ public:
     bool fuzzyShouldLog(int action);
     char* toString();
 
+    void addInclude(const std::string extension, const std::string uid, const std::string action, const std::string retname, const std::string format=std::string());
+    void addExclude(const std::string extension, const std::string uid, const std::string action, const std::string retname);
+    void setDefaultFormat(std::string format);
+
 protected:
     void parse(xmlNode*);
     std::vector<Filter> includes;

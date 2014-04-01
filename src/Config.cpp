@@ -57,10 +57,10 @@ void Config::parse(xmlNode * a_node)
 	{
 		if (cur_node->type == XML_ELEMENT_NODE)
 		{
-		xmlAttr *attr=cur_node->properties;
-		if (xmlStrcmp(cur_node->name,ROOT)==0)
+			xmlAttr *attr=cur_node->properties;
+			if (xmlStrcmp(cur_node->name,ROOT)==0)
 			{
-			while (attr!=NULL)
+				while (attr!=NULL)
 				{
 					if (xmlStrcmp(attr->name,LOG_ENABLED)==0)
 						{
@@ -79,59 +79,53 @@ void Config::parse(xmlNode * a_node)
 							}
 						}
 					else if (xmlStrcmp(attr->name,FORMAT)==0)
-						{
+					{
 							//default format loggedfs
 							this->defaultformat = Format((const char*)attr->children->content);
-						}
+					}
 					else
-						LOG_ERROR(Globals::instance()->errlog) << "unknown attribute " << attr->name << std::endl;
+						LOGGEDFS_ERROR(Globals::instance()->errlog) << "unknown attribute " << attr->name << std::endl;
 
-				    attr=attr->next;
+					attr=attr->next;
 				}
 			}
-		if (xmlStrcmp(cur_node->name,INCLUDE)==0 || xmlStrcmp(cur_node->name,EXCLUDE)==0)
+			if (xmlStrcmp(cur_node->name,INCLUDE)==0 || xmlStrcmp(cur_node->name,EXCLUDE)==0)
 			{
-			Filter* filter=new Filter();
-			filter->setFormat(this->defaultformat);
-			std::string buffer;
-			while (attr!=NULL)
+
+				std::string extension, uid, action, retname, format;
+
+				while (attr!=NULL)
 				{
-					buffer = std::string((char*)attr->children->content);
-
-					if (xmlStrcmp(attr->name,EXTENSION)==0)
-						{
-						filter->setExtension(buffer);
-						}
-					else if (xmlStrcmp(attr->name,USER)==0)
-						{
-						if (buffer.compare("*")!=0)
-							filter->setUID(atoi(buffer.c_str()));
-						else filter->setUID(-1); // every users
-
-						}
-					else if (xmlStrcmp(attr->name,ACTION)==0)
-						{
-						filter->setAction(buffer);
-						}
-					else if (xmlStrcmp(attr->name,RETNAME)==0)
-						{
-						filter->setRetname(buffer);
-						}
+					if (xmlStrcmp(attr->name, EXTENSION)==0)
+					{
+						extension = std::string((char*)attr->children->content);
+					}
+					else if (xmlStrcmp(attr->name, USER)==0)
+					{
+						uid = std::string((char*)attr->children->content);
+					}
+					else if (xmlStrcmp(attr->name, ACTION)==0)
+					{
+						action = std::string((char*)attr->children->content);
+					}
+					else if (xmlStrcmp(attr->name, RETNAME)==0)
+					{
+						retname = std::string((char*)attr->children->content);
+					}
 					else if (xmlStrcmp(attr->name,FORMAT)==0)
-						{
-						filter->setFormat(buffer);
-						}
+					{
+						format = std::string((char*)attr->children->content);
+					}
 					else
-						LOG_ERROR(Globals::instance()->errlog) << "unknown attribute " << attr->name << std::endl;
+						LOGGEDFS_ERROR(Globals::instance()->errlog) << "unknown attribute " << attr->name << std::endl;
 
-				    attr=attr->next;
+					attr=attr->next;
 				}
-			
-			if (xmlStrcmp(cur_node->name,INCLUDE)==0)
-				{
-				includes.push_back(*filter);
-				}
-			else excludes.push_back(*filter);
+
+				if (xmlStrcmp(cur_node->name,INCLUDE)==0)
+					this->addInclude(extension, uid, action, retname, format);
+				else
+					this->addExclude(extension, uid, action, retname);
 			}		
 		}
 
@@ -172,6 +166,43 @@ bool Config::loadFromXmlFile(const std::string filename)
 	return loadFromXml(doc);
 }
 
+void Config::addInclude(const std::string extension, const std::string uid, const std::string action, const std::string retname, const std::string format){
+	Filter f;
+	if(format.length()<=0)
+		f.setFormat(this->defaultformat);
+	else
+		f.setFormat(Format(format.c_str()));
+
+	if(uid.compare("*")!=0)
+		f.setUID(atoi(uid.c_str()));
+	else
+		f.setUID(-1); // every users
+
+	f.setExtension(extension);
+	f.setAction(action);
+	f.setRetname(retname);
+
+	includes.push_back(f);
+}
+void Config::addExclude(const std::string extension, const std::string uid, const std::string action, const std::string retname){
+	Filter f;
+//	f.setFormat(this->defaultformat);
+
+	if(uid.compare("*")!=0)
+		f.setUID(atoi(uid.c_str()));
+	else
+		f.setUID(-1); // every users
+
+	f.setExtension(extension);
+	f.setAction(action);
+	f.setRetname(retname);
+
+	excludes.push_back(f);
+}
+void Config::setDefaultFormat(std::string format){
+	this->defaultformat = Format(format.c_str());
+}
+
 bool Config::fuzzyShouldLog(int action)
 {
 	// this method tries to surley answer the question: shall 'action' not be logged?
@@ -188,7 +219,7 @@ bool Config::fuzzyShouldLog(int action)
 		for (unsigned int i=0;i<includes.size();i++)
 		{
 			Filter f=includes[i];
-			if (f.matches(FSOperations::actions[action],f.getAction())){
+			if (f.matchAction(FSOperations::actions[action])){
 				shallnotlog[action] = false;
 				return false;
 			}

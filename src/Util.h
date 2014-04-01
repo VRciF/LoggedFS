@@ -7,6 +7,7 @@
 #include <sys/time.h>
 
 #include <fstream>
+#include <iterator>
 
 #include "Globals.h"
 
@@ -138,8 +139,71 @@ class Util{
 			std::string message;
 			f->render(values, message);
 
-            cpplog::LogMessage(__FILE__, __LINE__, (LL_INFO), *Globals::instance()->logger, false).getStream() << message << std::endl;
+			LOGGEDFS_INFO(*Globals::instance()->logger) << message << std::endl;
 	    }
+	}
+	template <class OutIt>
+	static void explode(OutIt output, const std::string& str, const std::string delimiters, int limit=0) {
+		int factor = 0;
+		if(limit != 0)
+			factor = limit > 0 ? -1 : 1;
+
+	    std::vector<std::string> tokens;
+
+	    std::size_t subStrBeginPos = str.find_first_not_of(delimiters, 0);
+	    std::size_t subStrEndPos = str.find_first_of(delimiters, subStrBeginPos);
+
+	    while(std::string::npos != subStrBeginPos || std::string::npos != subStrEndPos)
+	    {
+	    	if(limit==1)
+	    		*output++ = str.substr(subStrBeginPos);
+	    	else
+	    	    *output++ = str.substr(subStrBeginPos, subStrEndPos-subStrBeginPos);
+
+	        subStrBeginPos = str.find_first_not_of(delimiters, subStrEndPos);
+	        subStrEndPos = str.find_first_of(delimiters, subStrBeginPos);
+
+	    	if(factor!=0 && limit!=0)
+	    		limit += factor;
+	    	if(factor!=0 && limit==0)
+	    		break;
+	    }
+	}
+	static void explode(std::vector<std::string> &tokens, const std::string& str, const std::string delimiters = " ", int limit=0)
+	{
+	    Util::explode<std::back_insert_iterator< std::vector<std::string> > >(std::back_insert_iterator< std::vector<std::string> >(tokens),
+	    		                                                              str, delimiters, limit);
+	    /*
+	    auto subStrBeginPos = str.find_first_not_of(delimiters, 0);
+	    auto subStrEndPos = str.find_first_of(delimiters, subStrBeginPos);
+
+	    while(std::string::npos != subStrBeginPos || std::string::npos != subStrEndPos)
+	    {
+	        tokens.push_back(str.substr(subStrBeginPos, subStrEndPos-subStrBeginPos));
+
+	        subStrBeginPos = str.find_first_not_of(delimiters, subStrEndPos);
+	        subStrEndPos = str.find_first_of(delimiters, subStrBeginPos);
+	    }
+	    */
+	}
+
+	static void parseStyleSheetFormat(std::map<std::string,std::string> keyvalue, const std::string& str){
+		std::vector<std::string> parts;
+		Util::explode(parts, str, ";");
+		std::vector<std::string>::iterator it;
+		for(it=parts.begin();it!=parts.end();++it){
+			std::vector<std::string> tuple;
+			Util::explode(tuple, *it, ":", 2);
+			if(tuple.size() <= 0)
+				continue;
+
+			std::string key, value;
+			if(tuple.size()>0)
+				key = tuple[0];
+			if(tuple.size()>1)
+				value = tuple[1];
+			keyvalue[key] = value;
+		}
 	}
 
 };

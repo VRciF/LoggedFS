@@ -2,26 +2,15 @@
 #define LOGGEDFS_GLOBALS_H
 
 #include <vector>
+#include <ext/stdio_filebuf.h>
 
 #include "Config.h"
 #include "Format.h"
 
 #include "cpplog/cpplog.hpp"
-/*
-class NullLogger : public cpplog::BaseLogger
-{
-public:
-	NullLogger()
-	{ }
 
-	virtual bool sendLogMessage(cpplog::LogData* logData)
-	{
-		return true;
-	}
-
-	virtual ~NullLogger() { }
-};
-*/
+#define LOGGEDFS_ERROR(logger) cpplog::LogMessage(__FILE__, __LINE__, (LL_ERROR),(logger), false).getStream()
+#define LOGGEDFS_INFO(logger) cpplog::LogMessage(__FILE__, __LINE__, (LL_INFO),(logger), false).getStream()
 
 class Globals{
 public:
